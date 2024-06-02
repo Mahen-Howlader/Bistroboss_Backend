@@ -2,7 +2,8 @@ var express = require('express')
 var cors = require('cors')
 var jwt = require('jsonwebtoken');
 var app = express()
-require('dotenv').config()
+require('dotenv').config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 app.use(cors())
 app.use(express.json())
 const port = process.env.PORT || 5000;
@@ -117,7 +118,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/carts", verifyToken, verifyAdmin, async (req, res) => {
+    app.post("/carts", async (req, res) => {
       const body = req.body;
       const result = await cartsCollection.insertOne(body);
       res.send(result);
@@ -191,6 +192,29 @@ async function run() {
     app.listen(port, () => {
       console.log(`Example app listening on port ${port}`);
     });
+
+
+    //  payment 
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      console.log(price)
+      const amount = parseInt(price * 100)
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types: ["card"],
+      })
+
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      });
+
+    }
+    );
+
+
+
   } finally {
     // Do not close the client here to keep the connection alive for incoming requests
   }
