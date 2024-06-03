@@ -3,7 +3,7 @@ var cors = require('cors')
 var jwt = require('jsonwebtoken');
 var app = express()
 require('dotenv').config();
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 app.use(cors())
 app.use(express.json())
 const port = process.env.PORT || 5000;
@@ -43,6 +43,7 @@ async function run() {
     const reviewCollection = client.db("bistroDB").collection("review");
     const cartsCollection = client.db("bistroDB").collection("carts");
     const usersCollection = client.db("bistroDB").collection("users");
+    const paymentCollection = client.db("bistroDB").collection("payment");
 
     // Middleware to verify admin role
     const verifyAdmin = async (req, res, next) => {
@@ -85,7 +86,7 @@ async function run() {
       const item = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
-      console.log(item)
+      // console.log(item)
       const updateDoc = {
         $set: {
           name: item.name,
@@ -195,9 +196,11 @@ async function run() {
 
 
     //  payment 
+
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
-      console.log(price)
+      // const price = 500;
+      console.log("payment price", req.body.price)
       const amount = parseInt(price * 100)
 
       const paymentIntent = await stripe.paymentIntents.create({
@@ -212,6 +215,43 @@ async function run() {
 
     }
     );
+
+
+
+
+
+    // payment 
+    app.post("/payments", async (req, res) => {
+      const data = req.body;
+
+      const paymentResult = await paymentCollection.insertOne(data)
+      // console.log("payment info", data)
+      const query = {
+        _id: {
+          $in:
+            data.cartId.map(id => new ObjectId(id))
+
+        }
+      }
+      const deleteResult = await cartsCollection.deleteMany(query)
+
+      res.send({paymentResult,deleteResult})
+    })
+
+
+    // payment history 
+    app.get("/payments/:email", async (req,res) => {
+      const email = req.params.email
+      const query = {email : email}
+      if(email !== req.decoded.email){
+       return res.status(403).send({message : "Forbiden message"})
+      }
+
+      const paymentResult = await paymentCollection.find(query).toArray()
+      res.send(paymentResult)
+    })
+
+
 
 
 
